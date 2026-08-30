@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#020202">
+<title>ホワイトボードから、腕を動かす機構まで — MetaPuppet</title>
+<meta name="description" content="4月2日のホワイトボードの落書きから、ポールを立て、ドラムを巻き、サーボを組み込み、4系統のモーターへ拡張するまで。MetaPuppetのハードウェアが生まれた経緯の記録。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ホワイトボードから、腕を動かす機構まで — MetaPuppet">
+<meta property="og:description" content="4月2日の発想から4系統のモーター機構まで。MetaPuppetのハードウェアが生まれた経緯の記録。">
+<meta property="og:url" content="https://meta-puppet.github.io/genesis/">
+<meta property="og:image" content="https://meta-puppet.github.io/genesis/mp_logo.png">
+<link rel="icon" type="image/png" href="mp_logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root{
+  --paper:#020202;
+  --paper-raised:#0e0e10;
+  --ink:#f2f0ee;
+  --ink-soft:#9a9a9e;
+  --ink-faint:#6e6e73;
+  --rule:#232326;
+  --rule-strong:#35353a;
+  --accent:#e78fb3;
+  --accent-soft:#3a2530;
+  --accent2:#6fbfc4;
+  --accent2-soft:#193638;
+  --code-bg:#0a0a0b;
+  --code-ink:#e7e6e0;
+  --code-accent:#e78fb3;
+  --code-accent2:#6fbfc4;
+}
+
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --paper:#faf9f6;
+    --paper-raised:#f2f0eb;
+    --ink:#171a1d;
+    --ink-soft:#4b5459;
+    --ink-faint:#8b9296;
+    --rule:#d8d5cd;
+    --rule-strong:#b9b5aa;
+    --accent:#b8500e;
+    --accent-soft:#e8c7a9;
+    --accent2:#14646b;
+    --accent2-soft:#bcdadc;
+    --code-bg:#171a1d;
+    --code-ink:#e7e6e0;
+    --code-accent:#e0954f;
+    --code-accent2:#6fbfc4;
+  }
+}
+:root[data-theme="light"]{
+  --paper:#faf9f6;
+  --paper-raised:#f2f0eb;
+  --ink:#171a1d;
+  --ink-soft:#4b5459;
+  --ink-faint:#8b9296;
+  --rule:#d8d5cd;
+  --rule-strong:#b9b5aa;
+  --accent:#b8500e;
+  --accent-soft:#e8c7a9;
+  --accent2:#14646b;
+  --accent2-soft:#bcdadc;
+  --code-bg:#171a1d;
+  --code-ink:#e7e6e0;
+  --code-accent:#e0954f;
+  --code-accent2:#6fbfc4;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Noto Sans JP","Hiragino Sans",sans-serif;
+  font-size:15.5px;
+  line-height:1.9;
+  -webkit-font-smoothing:antialiased;
+}
+
+.page{
+  max-width:760px;
+  margin:0 auto;
+  padding:26px 40px 90px;
+}
+
+.cover{
+  max-width:760px;
+  margin:0 auto;
+  padding:76px 40px 60px;
+  border-bottom:1px solid var(--rule);
+}
+.cover-kicker{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;
+  letter-spacing:.18em;
+  color:var(--accent);
+  text-transform:uppercase;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:22px;
+}
+.cover-kicker::before{
+  content:"";
+  width:26px;height:1px;
+  background:var(--accent);
+  display:inline-block;
+}
+.cover h1{
+  font-family:"Hanken Grotesk","Noto Sans JP",sans-serif;
+  font-weight:800;
+  font-size:clamp(30px,5.2vw,46px);
+  line-height:1.4;
+  margin:0 0 20px;
+  text-wrap:balance;
+  letter-spacing:.01em;
+}
+.cover h1 em{
+  font-style:normal;
+  color:var(--accent);
+}
+.cover .sub{
+  font-size:15.5px;
+  color:var(--ink-soft);
+  max-width:56ch;
+  margin:0 0 34px;
+  text-wrap:balance;
+}
+.cover-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:28px 40px;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:12px;
+  color:var(--ink-soft);
+  border-top:1px solid var(--rule);
+  padding-top:22px;
+}
+.cover-meta div span{
+  display:block;
+  color:var(--ink-faint);
+  font-size:10px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  margin-bottom:4px;
+}
+.cover-meta div b{
+  color:var(--ink);
+  font-weight:700;
+  font-family:"Noto Sans JP",sans-serif;
+  font-size:13.5px;
+}
+.cover-meta .author{display:inline-flex; align-items:center; gap:8px;}
+.cover-meta .author img{width:22px; height:22px; border-radius:50%; object-fit:cover; display:block; filter:grayscale(1);}
+
+.pipeline{
+  max-width:760px;
+  margin:0 auto;
+  padding:26px 40px 30px;
+  display:flex;
+  align-items:stretch;
+  gap:0;
+  overflow-x:auto;
+  border-bottom:1px solid var(--rule);
+  background:var(--paper-raised);
+}
+.pl-step{
+  flex:1 0 auto;
+  min-width:96px;
+  padding:6px 12px;
+  position:relative;
+  font-family:"IBM Plex Mono",monospace;
+}
+.pl-step .n{
+  font-size:10px;
+  color:var(--accent);
+  letter-spacing:.08em;
+}
+.pl-step .t{
+  font-size:12px;
+  color:var(--ink);
+  font-weight:700;
+  margin-top:3px;
+  line-height:1.4;
+}
+.pl-step:not(:last-child)::after{
+  content:"→";
+  position:absolute;
+  right:-2px;
+  top:50%;
+  transform:translateY(-50%);
+  color:var(--ink-faint);
+  font-size:13px;
+}
+
+.chapter{
+  border-top:1px solid var(--rule-strong);
+  padding-top:46px;
+  margin-top:10px;
+}
+.chapter:first-of-type{border-top:none;}
+.chapter-head{
+  display:flex;
+  align-items:baseline;
+  gap:16px;
+  margin-bottom:8px;
+}
+.chapter-num{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:13px;
+  color:var(--accent2);
+  letter-spacing:.05em;
+  white-space:nowrap;
+}
+.chapter-stage{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:10.5px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+}
+.chapter h2{
+  font-family:"Hanken Grotesk","Noto Sans JP",sans-serif;
+  font-weight:700;
+  font-size:26px;
+  margin:6px 0 30px;
+  text-wrap:balance;
+}
+.lede{
+  font-size:15.5px;
+  color:var(--ink-soft);
+  border-left:3px solid var(--accent);
+  padding-left:18px;
+  margin:0 0 34px;
+  text-wrap:balance;
+}
+.chapter p{margin:0 0 20px;}
+
+.chapter a, .cover a, .footnotes a{
+  color:var(--accent2);
+  text-decoration-color:var(--rule-strong);
+  text-underline-offset:2px;
+}
+.chapter a:visited, .cover a:visited, .footnotes a:visited{color:var(--accent2);}
+.chapter a:hover, .cover a:hover, .footnotes a:hover{color:var(--accent);}
+
+.embed{margin:28px 0;}
+.embed img{width:100%; height:auto; border:1px solid var(--rule-strong); border-radius:2px; display:block;}
+.embed-caption{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-faint); margin-top:8px;}
+.embed.portrait img{max-width:320px; margin:0 auto;}
+.embed.portrait .embed-caption{max-width:320px; margin-left:auto; margin-right:auto; text-align:center;}
+
+.pair{
+  display:flex;
+  gap:16px;
+  margin:28px 0;
+  flex-wrap:wrap;
+}
+.pair figure{
+  flex:1 1 220px;
+  margin:0;
+}
+.pair img{width:100%; height:auto; border:1px solid var(--rule-strong); border-radius:2px; display:block;}
+.pair figcaption{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-faint); margin-top:8px; text-align:center;}
+
+.timestamp{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;
+  color:var(--accent);
+  letter-spacing:.05em;
+  margin-bottom:14px;
+}
+.timestamp::before{content:"";width:16px;height:1px;background:var(--accent);display:inline-block;}
+
+.signature{
+  margin-top:56px;
+  padding-top:22px;
+  border-top:1px solid var(--rule);
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  font-size:13px;
+  color:var(--ink-faint);
+  font-family:"IBM Plex Mono",monospace;
+}
+
+.pagefoot{
+  max-width:760px;
+  margin:0 auto;
+  padding:30px 40px 60px;
+  color:var(--ink-faint);
+  font-family:"IBM Plex Mono",monospace;
+  font-size:11px;
+  text-align:center;
+  letter-spacing:.05em;
+}
+
+.site-header{
+  position:sticky;
+  top:0;
+  z-index:50;
+  width:100%;
+  background:color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule);
+}
+.site-header-inner{
+  max-width:760px;
+  margin:0 auto;
+  padding:16px 40px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+}
+.site-header .brand{
+  display:inline-flex;
+  align-items:center;
+  line-height:0;
+  opacity:.95;
+  transition:opacity .15s ease;
+}
+.site-header .brand:hover{opacity:1;}
+.site-header img{
+  height:40px;
+  width:auto;
+  display:block;
+}
+.site-nav{
+  display:flex;
+  gap:22px;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:12.5px;
+  letter-spacing:.04em;
+}
+.site-nav a{
+  color:var(--ink-faint);
+  text-decoration:none;
+}
+.site-nav a:hover{color:var(--accent);}
+.site-nav a[aria-current="page"]{color:var(--ink);}
+
+@media print{
+  .site-header{display:none;}
+  body{background:#fff;color:#111;font-size:11pt;}
+  .page,.cover,.pipeline,.pagefoot{max-width:none;padding-left:0;padding-right:0;}
+  @page{size:A4;margin:24mm 18mm;}
+  .chapter{page-break-before:always;border-top:none;padding-top:0;}
+  .chapter:first-of-type{page-break-before:avoid;}
+  a{color:inherit;text-decoration:underline;}
+}
+
+@media (max-width:600px){
+  .page,.cover,.pipeline,.pagefoot{padding-left:20px;padding-right:20px;}
+}
+</style>
+</head>
+<body>
+
+<article>
+
+<div class="site-header">
+  <div class="site-header-inner">
+    <a class="brand" href="https://meta-puppet.github.io/" aria-label="MetaPuppet トップへ戻る"><img src="mp_logo.png" alt="MetaPuppet"></a>
+    <nav class="site-nav">
+      <a href="https://meta-puppet.github.io/">Reports</a>
+      <a href="https://meta-puppet.github.io/credits/">Credits</a>
+    </nav>
+  </div>
+</div>
+
+<section class="cover">
+  <div class="cover-kicker">Build Log — MetaPuppet</div>
+  <h1>ホワイトボードから、<em>腕を動かす機構</em>まで</h1>
+  <p class="sub">4月2日、ホワイトボードに向かって「主体感」「身体所有感」という言葉を書き殴ったところから、この機構は始まった。ポールを立て、ドラムを巻き、サーボを組み込み、4系統に増えるまでの記録。</p>
+  <div class="cover-meta">
+    <div><span>Author</span><b class="author"><img src="anji_icon.jpeg" alt="">Anji Fujiwara</b></div>
+    <div><span>Start</span><b>2026-04-02</b></div>
+  </div>
+</section>
+
+<div class="pipeline">
+  <div class="pl-step"><div class="n">01</div><div class="t">発想と<br>ホワイトボード</div></div>
+  <div class="pl-step"><div class="n">02</div><div class="t">カメラの<br>最初の試作</div></div>
+  <div class="pl-step"><div class="n">03</div><div class="t">ポールの<br>試作</div></div>
+  <div class="pl-step"><div class="n">04</div><div class="t">フレームを<br>立てる</div></div>
+  <div class="pl-step"><div class="n">05</div><div class="t">ドラムの<br>試作</div></div>
+  <div class="pl-step"><div class="n">06</div><div class="t">サーボを<br>組み込む</div></div>
+  <div class="pl-step"><div class="n">07</div><div class="t">マウントを<br>作り直す</div></div>
+  <div class="pl-step"><div class="n">08</div><div class="t">4系統へ<br>拡張</div></div>
+</div>
+
+<div class="page">
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Prologue</span>
+    <span class="chapter-stage">2026-04-02</span>
+  </div>
+  <h2>ホワイトボードの前で</h2>
+
+  <p>この機構が最初にかたちを持ったのは、金属の見た目ではなく、赤いマーカーの線としてだった。ホワイトボードには「制御の視点」「整合性」というメモの隣に、agency(主体感)、ownership(身体所有感)、body-schema(身体図式)、haptics(触覚)といった言葉が並び、それらを線でつなぎ合わせた図が残っている。「動かす自分」と「動かされる自分」を同じ体の中に同居させる、という後にMetaPuppetの核になる発想は、この時点ではまだ、丸で囲んだ単語同士の関係でしかなかった。</p>
+
+  <div class="embed portrait">
+    <img src="01_idea.jpg" alt="ホワイトボードに赤いマーカーで書かれたメモ。agency、subliminal、body-schema、ownershipといった単語が丸で囲まれ、線で結ばれている。上部には冗談で書かれたPDCA(Plan Delay Cancel Apologize)のポスターが貼られている" loading="lazy">
+    <div class="embed-caption">2026年4月2日、最初のホワイトボード。agency・ownership・body-schemaという単語がすでに並んでいる</div>
+  </div>
+
+  <p>この記録は、その落書きが実際に人の腕を動かす機構になるまでを、写真だけで辿ったものである。技術的な詳細(通信プロトコルやPD制御の中身)は他の記事に譲り、ここでは機構そのものの見た目がどう変わっていったかだけを追う。</p>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 01</span>
+    <span class="chapter-stage">Camera, first pass</span>
+  </div>
+  <h2>まずはカメラから</h2>
+
+  <p>最初に手を動かしたのは、腕を動かす機構ではなく、カメラだった。Raspberry Pi用のカメラモジュールを2台、三脚のヘッドに並べて留めただけの、ステレオカメラの最初の試作。まだ専用の基板もケースもなく、リボンケーブルが剥き出しのままぶら下がっている。</p>
+
+  <div class="embed portrait">
+    <img src="06_camera_rig.jpg" alt="三脚のヘッドに2台のRaspberry Piカメラモジュールが取り付けられている。リボンケーブルが剥き出しでぶら下がっている" loading="lazy">
+    <div class="embed-caption">最初のステレオカメラ試作。三脚のヘッドに2台のカメラモジュールを並べただけの状態</div>
+  </div>
+
+  <p>その後、Raspberry Pi本体に直結して映像が出ることを机の上で確認する。ここではまだ台にも固定されておらず、ケーブルを手で押さえながらの動作確認だった。</p>
+
+  <div class="embed portrait">
+    <img src="07_camera_pi.jpg" alt="木製の机の上に置かれたRaspberry Pi本体に、2台のカメラモジュールを取り付けたブラケットがオレンジ色のリボンケーブルで接続されている" loading="lazy">
+    <div class="embed-caption">Raspberry Pi本体に直結して映像が出ることを確認する</div>
+  </div>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 02</span>
+    <span class="chapter-stage">Pole, first pass</span>
+  </div>
+  <h2>ポールの試作</h2>
+
+  <p>カメラと並行して、腕を持ち上げる側の機構も試作が始まる。最初に検討したのは、ケーブルを巻き取るドラム式ではなく、ポール(棒)を押し上げる方式だった。緑色の3Dプリント部品2つで2本のポールを橋渡しし、先端に丸いキャップを取り付けただけの、ごく素朴な試作。</p>
+
+  <div class="embed portrait">
+    <img src="02_pole.jpg" alt="床に置かれた2本の黒いポールが緑色の3Dプリント部品2つで連結されている。先端には手で持っているグレーの楕円形キャップが取り付けられている" loading="lazy">
+    <div class="embed-caption">ポール式の機構、最初の試作。先端のキャップを手で持って可動範囲を確かめている</div>
+  </div>
+
+  <p>最終的に採用されたのはポールを直接押し上げる方式ではなく、サーボでケーブルを巻き取る方式だったが、その分岐点はここにある。</p>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 03</span>
+    <span class="chapter-stage">Standing the frame</span>
+  </div>
+  <h2>フレームを立てる</h2>
+
+  <p>ポールを寝かせて確かめていた試作は、やがて床から立ち上がる。棚を利用して2本のポールを垂直に立て、上部をクロスバーで結んだ状態がこの写真である。クロスバーには緑色の3Dプリントマウントが2つ取り付けられ、黄色い紐がテスト用にぶら下がっているが、まだサーボは載っていない。手前の机には、はんだごてやドライバーセット、3Dプリント部品の試作品が散らばっている。</p>
+
+  <div class="embed">
+    <img src="03_frame.jpg" alt="室内で2本の黒いポールが棚に立てかけられ、上部が黒いクロスバーで連結されている。クロスバーには緑色の3Dプリントマウントが2つ取り付けられ、黄色い紐が垂れている。手前の机にははんだごてや工具、3Dプリント部品が散らばっている" loading="lazy">
+    <div class="embed-caption">ポールを初めて立てた状態。クロスバーのマウントはまだサーボなしで、紐だけを通して可動範囲を確かめている</div>
+  </div>
+
+  <p>この段階では、机の上の道具のほうが機構そのものより多い。ここから先の作業のほとんどは、この机の上で起きている。</p>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 04</span>
+    <span class="chapter-stage">Spool, before the servo</span>
+  </div>
+  <h2>サーボの前に、糸巻きだけを試す</h2>
+
+  <p>サーボを組み込む前に、まず糸を巻き取る仕組みそのものを別のポールの組で試している。緑色のマウントの中に、糸が巻かれた小さな軸が収まっているのが見える。この時点ではまだモーターは接続されておらず、手で軸を回して巻き取り量を確かめる、purely mechanicalな検証だった。</p>
+
+  <div class="embed portrait">
+    <img src="04_spool.jpg" alt="2本の黒いポールに緑色の3Dプリントマウントが取り付けられ、その中に糸が巻かれた小さな軸が収まっている。下側のポールには青いリング状の部品も取り付けられている" loading="lazy">
+    <div class="embed-caption">糸巻き機構だけを取り出した試作。モーターはまだ繋がっていない</div>
+  </div>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 05</span>
+    <span class="chapter-stage">The servo and the drum</span>
+  </div>
+  <h2>サーボとドラム</h2>
+
+  <p>糸巻きの検証と並行して、実際に使うサーボとドラムの実物合わせが行われている。サーボはFeetechのSTS3215(7.4V、ギア比1:191)。その出力軸に、青色で3Dプリントしたドラムを仮組みした写真がこれで、ドラムの側面にはケーブルを整列させるための螺旋状の溝が切られ、端面には配線や軸を通すための穴が並んでいる。</p>
+
+  <div class="embed portrait">
+    <img src="05_drum.jpg" alt="机の上に置かれた黒いFeetech STS3215サーボに、青色の3Dプリント製ドラムが取り付けられている。ドラムの側面には螺旋状の溝が彫られ、端面には複数の穴が並んでいる" loading="lazy">
+    <div class="embed-caption">STS3215サーボと、初めて組んだ青色の3Dプリント製ドラム。側面の螺旋溝でケーブルを整列させる</div>
+  </div>
+
+  <p>ここでようやく、「サーボの回転がドラムを回し、ドラムがケーブルを巻き取る」という、現在の機構の基本原理が実物として組み上がる。</p>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 06</span>
+    <span class="chapter-stage">Updated mount</span>
+  </div>
+  <h2>マウントを一度作り直す</h2>
+
+  <p>サーボとドラムが組み上がったところで、フレーム側のマウントも更新される。Raspberry Piにはヒートシンクとファンの付いた冷却ケースが加わり、青色のマウントに固定された。クロスバー側の緑色のマウントには、内部に黄色いケーブルを通す穴が開けられている。</p>
+
+  <div class="embed">
+    <img src="08_updated_mount.jpg" alt="黒いポールに青色のマウントで固定されたRaspberry Pi。ヒートシンクとファンの付いた黒い冷却ケースが載っている。奥には緑色のモーターマウントがクロスバーに取り付けられ、黄色いケーブルが通されている" loading="lazy">
+    <div class="embed-caption">冷却ケース付きのRaspberry Piと、更新されたモーターマウント</div>
+  </div>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 07</span>
+    <span class="chapter-stage">Old vs. new mount</span>
+  </div>
+  <h2>設計の比較 — 緑から灰色へ</h2>
+
+  <p>最初の緑色のマウント(左)は、サーボを収める場所こそあったものの、出力軸を支える仕組みがなく、ドラムも小さかった。作り直した灰色のマウント(右)では、サーボがしっかりと収まる形状になり、反対側の軸をボールベアリングで支える構造が追加されている。手前に置かれた2つのドラムを比べても、右側の白いドラムのほうが一回り大きい。</p>
+
+  <div class="embed">
+    <img src="09_mount_compare.jpg" alt="机の上に並んだ2つの3Dプリントマウント。左の緑色のマウントは内部が空洞で軸受けがない。右の灰色のマウントにはサーボが実装され、反対側の軸にボールベアリングが取り付けられている。手前には小さい青色のドラムと、一回り大きい白色のドラムが置かれている" loading="lazy">
+    <div class="embed-caption">左: 最初の緑色マウント(軸受けなし、小さいドラム)。右: 作り直した灰色マウント(サーボ実装、ボールベアリング付き、大きいドラム)</div>
+  </div>
+
+  <p>1つのマウントを設計し直すだけでも、サーボの収まり方、軸の支え方、ドラムの大きさという3つの要素が同時に変わっている。見た目の変化は小さいが、この作り直しがなければ、後の4系統への拡張には耐えられなかったはずである。</p>
+</section>
+
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">Chapter 08</span>
+    <span class="chapter-stage">Four channels</span>
+  </div>
+  <h2>2系統から4系統へ</h2>
+
+  <p>ここまでの試作はすべて、左右の手首を持ち上げる2系統のサーボ(ID 5・6)を前提にしていた。現在の機構は、そこに左右の肘を持ち上げる2系統を加え、A・B・C・Dの4系統に拡張されている。4本のポールにそれぞれ独立したマウントが取り付けられ、色分けされた文字で見分けられるようになっている。</p>
+
+  <div class="embed">
+    <img src="10_four_channel.jpg" alt="4本の黒いポールが並び、それぞれに黒いマウントが取り付けられている。マウントにはA・B・C・Dの文字が水色・白・緑・水色で書かれている" loading="lazy">
+    <div class="embed-caption">現在の4系統構成。A・B・C・Dの各マウントが、左右の手首・肘に対応する</div>
+  </div>
+
+  <p>手首2系統だけを動かしていた頃の機構と比べると、ポールの本数も、マウントの精度も、ここまでの試作を1つずつ積み重ねた結果になっている。この先の通信プロトコルやPD制御の詳細は、<a href="https://meta-puppet.github.io/control/">ハードウェアと制御の実装記録</a>のほうにまとめている。</p>
+
+  <div class="signature">
+    <div>MetaPuppet — Build Log</div>
+    <div>Anji Fujiwara</div>
+  </div>
+</section>
+
+</div>
+
+<div class="pagefoot">MetaPuppet</div>
+
+</article>
+</body>
+</html>
